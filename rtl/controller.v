@@ -89,7 +89,7 @@
 //
 //
 // NOT IMPLEMENTED YET : pool_en is decoded but the 2x2 maxpool line buffer on
-// the drain path is still to be built (CLAUDE.md 7.4). Layers that pool will
+// the drain path is still to be built. Layers that pool will
 // emit the unpooled map until then.
 //////////////////////////////////////////////////////////////////////////////////
 module controller #(
@@ -376,7 +376,7 @@ module controller #(
 
 //---------------------------------------------------------------- [5] DMA desc
     // Task 1's 0x9000 is inside the CNN weight table, which now spans
-    // 0x0000..0xAB80 (686 tiles x 64 words). See CLAUDE.md section 7 for the
+    // 0x0000..0xAB80 (686 tiles x 64 words). See docs/DESIGN_NOTES.md section 7 for the
     // full map; Python must place the BN table here.
     localparam [15:0]      BN_DRAM_BASE = 16'hAB80;
     localparam [LEN_W-1:0] BN_WORDS     = 13'd432;

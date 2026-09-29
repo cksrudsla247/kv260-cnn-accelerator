@@ -4,7 +4,7 @@ Companion to the other two documents, not a replacement:
 
 | file | answers |
 |------|---------|
-| `CLAUDE.md` | project rules, parameters, per-layer mapping, CSR map, traps |
+| `DESIGN_NOTES.md` | project rules, parameters, per-layer mapping, CSR map, traps |
 | `DATAFLOW.md` | **why** the loops and layouts are what they are, worked cycle traces |
 | `ARCHITECTURE.md` (this) | **what** each module and signal is, and where every byte goes |
 
@@ -104,7 +104,7 @@ one ibuf row = ROW_SIZE * DATA_WIDTH = 64 bit = 8 bytes = eight numbers
 | `csr_data` | in | 32 | value |
 | `done` | out | 1 | one-cycle pulse, layer finished |
 
-CSR contents are in `CLAUDE.md` section 7. Register 7 is START.
+CSR contents are in `DESIGN_NOTES.md` section 7. Register 7 is START.
 
 ### 4.2 DRAM — `top.v` → `tester.v`
 

@@ -65,7 +65,7 @@ module tester (
     assign h_rdata    = pa_dout;
 
 //---------------------------------------------------------------- CSR sequencer
-    // Task 1's 0xC300 is inside the CNN activation buffers. See CLAUDE.md
+    // Task 1's 0xC300 is inside the CNN activation buffers. See docs/DESIGN_NOTES.md
     // section 7 for the full map.
     localparam [15:0] PROG_BASE = 16'hEA80;   // CSR program lives here in DRAM
     localparam [2:0]

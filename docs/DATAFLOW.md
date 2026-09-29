@@ -1,6 +1,6 @@
 # CNN accelerator — dataflow, decisions, and a worked example
 
-Companion to `CLAUDE.md`. That file is the short context; this one explains
+Companion to `DESIGN_NOTES.md`. That file is the design record; this one explains
 **how a layer actually runs, cycle by cycle and address by address**, and why
 each decision went the way it did.
 
@@ -229,7 +229,7 @@ so each group must be contiguous, exactly like every other activation.
 ```
 
 `in_words = 784 * 4 = 3136`, sixteen times the original 196-word image. PE
-utilisation is 9/16 = 56%. Both are accepted — see `CLAUDE.md` section 13.
+utilisation is 9/16 = 56%. Both are accepted — see `DESIGN_NOTES.md` section 13.
 
 Weights, two tiles of 64 words:
 

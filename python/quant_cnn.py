@@ -12,7 +12,7 @@ Outputs, into the directory given by --out (default: this file's directory):
 The trained network lives at  <T2>/params_hw.pkl  and must NOT be retrained;
 run_hw.py would overwrite it and invalidate every golden value.
 
-CONTRACTS THIS FILE MUST HONOUR  (see CLAUDE.md sections 6, 7 and 15)
+CONTRACTS THIS FILE MUST HONOUR  (see docs/DESIGN_NOTES.md sections 6, 7 and 15)
 
   weight tile      (ft, ct, fh, fw) with fw fastest; one tile is 64 words,
                    word 8r+b byte j = W[fn = 4b+j][c = ct*8+r][fh][fw]
@@ -458,7 +458,7 @@ def main():
         ct_stride = H * W * NB_IN
 
         # every CSR field that indexes DRAM or counts iterations, against its
-        # own width. CLAUDE.md section 12: silent truncation has bitten this
+        # own width. docs/DESIGN_NOTES.md section 12: silent truncation has bitten this
         # project twice and both times was invisible in simulation.
         assert C_pad // ROW_SIZE - 1 <= 0xFF, f"{name}: ct_max overflows 8 bits"
         assert FN_pad // COL_SIZE - 1 <= 0xF, f"{name}: ft_max overflows 4 bits"
