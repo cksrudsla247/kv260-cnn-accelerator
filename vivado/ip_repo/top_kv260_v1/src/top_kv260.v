@@ -1,6 +1,6 @@
 `timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
-// Module : top_zedboard     (board top : Zynq PS <-> top (core+dma) via AXI)
+// Module : top_kv260     (board top : Zynq UltraScale+ PS <-> top (core+dma) via AXI)
 //
 //   Wraps the simulation-only top.v (CSR/DRAM as plain wires) with the two
 //   AXI adapters so it can sit behind a real Zynq PS. top.v itself, core.v,
@@ -8,7 +8,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 module top_kv260 (
     input                        clk,
-    input                        rst,              // active HIGH (from PS FCLK_RESET0_N, inverted)
+    input                        rst,              // active HIGH (rst_ps8_0_96M peripheral_reset)
 
     //---- AXI4-Lite slave : PS master port -> here (CSR control) --------------
     input      [5:0]             s_axi_awaddr,

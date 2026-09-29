@@ -195,7 +195,7 @@ BN constants            432
 CSR program              64
 ---------------------------------
 TOTAL                54,960
-dram IP as built     50,176         <- must be regenerated
+dram IP             65,536
 16-bit address limit 65,536         <- hard ceiling; 92% used
 ```
 
@@ -579,5 +579,5 @@ One mutant was **not** caught and was confirmed equivalent, not a gap:
 in every reachable state, because non-final chunks always close with
 `out_row == OB_DEPTH` and the final chunk's update is immediately reset.
 
-The whole `tb_top` hierarchy elaborates with zero warnings. What is **not** yet
-verified is data correctness end to end; that needs the Python golden model.
+The whole `tb_top` hierarchy elaborates with zero warnings, and all six layers
+are bit-exact against the Python golden model (928/928).

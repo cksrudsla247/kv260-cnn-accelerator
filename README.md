@@ -219,11 +219,11 @@ from `psu_init`.
 ## 6. Repository layout
 
 ```
-rtl/                synthesizable Verilog (26 modules + top_kv260, AXI adapters)
+rtl/                synthesizable Verilog (23 files: datapath, top.v, top_kv260, 2 AXI adapters)
 rtl/ip/             blk_mem_gen .xci for ibuf / wbuf / obuf / accumulator
 sim/                testbenches + tester.v (PS model); sim/ip/dram.xci
 python/             quant_cnn.py (quantiser + golden model), quant.json,
-                    dram.txt / gold.txt / gold_addr.txt (generated), debug tools
+                    dram.txt / gold.txt / gold_addr.txt (generated), analyze_got.py
 constraints/        clk.xdc (100 MHz)
 vivado/bd/          KV260 block design (CNN_KV260.bd) + its IP configs
 vivado/ip_repo/     top_kv260 packaged as a Vivado IP

@@ -87,10 +87,6 @@
 //            [6]stream sink [7]ping-pong [8]FSM-next [9]weight push
 //            [10]compute [11]drain
 //
-//
-// NOT IMPLEMENTED YET : pool_en is decoded but the 2x2 maxpool line buffer on
-// the drain path is still to be built. Layers that pool will
-// emit the unpooled map until then.
 //////////////////////////////////////////////////////////////////////////////////
 module controller #(
     parameter ROW_SIZE   = 8,     // PE rows    : reduction width

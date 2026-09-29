@@ -1,4 +1,9 @@
-# Task 2 — CNN accelerator on Zedboard (XC7Z020)
+# CNN accelerator — design notes
+
+Developed and first synthesised for the Zedboard (XC7Z020, Vivado 2019.2), then
+brought up on the Kria KV260 (xck26, Vivado / Vitis 2022.1). Sections 2-15 are
+the design record from the XC7Z020 phase; board results are in
+`KV260_HW_BRINGUP.md`.
 
 Task 1 (MLP accelerator)
 is complete and verified; this is the CNN follow-on that reuses its datapath.
@@ -7,7 +12,8 @@ is complete and verified; this is the CNN follow-on that reuses its datapath.
 
 ## 1. Ground rules
 
-- Verilog only, **not** SystemVerilog. Vivado 2019.2.
+- Verilog only, **not** SystemVerilog (one exception: several modules declare
+  `localparam` in the parameter port list, which needs `-g2012` in Icarus).
 - Comments in RTL files are **English only**.
 - Correctness and understanding come before resource efficiency.
 - Every RTL change is verified bit-exact against a Python golden model. A
@@ -451,7 +457,7 @@ BN constants            432
 CSR program              64
 ---------------------------------
 TOTAL                54,960 words
-dram IP as built     50,176         <- TOO SMALL, must be regenerated
+dram IP             65,536
 16-bit address limit 65,536         <- hard ceiling, 92% used
 ```
 
@@ -630,7 +636,11 @@ pooling** (7x7 and 9x9), and checks:
 
 ---
 
-## 11. What still has to be built
+## 11. Bring-up plan (all done)
+
+Kept as the plan it was. All three items are complete: the `dram` IP is 65,536
+words, `tb_top.v` is updated, and the CSR program covers all six layers
+(section 10).
 
 1. **`dram` IP 50,176 -> 65,536** in Vivado. Nothing else needs regenerating.
    The four buffer IPs stay exactly as built — measured usage is ibuf 28/32,
@@ -885,20 +895,21 @@ RTL: `top.v`, `core.v`, `controller.v`, `dma.v`, `accumulator.v`, `maxpool.v`,
 `pe_adder_tree.v`, `pe_col.v`, `PE.v`, `multiplier.v`, `adder_tree.v`,
 `tester.v`, `tb_top.v`.
 
-Testbenches: `tb_accumulator.v`, `tb_controller.v`, `tb_maxpool.v`, `tb_top.v`.
+Testbenches: `tb_accumulator.v`, `tb_controller.v`, `tb_maxpool.v`,
+`tb_multiplier.v`, `tb_axi4_dma.v`, `tb_axi_lite_csr.v`, `tb_top.v`, `tb_top_kv260.v`.
 
-`tester.v` models the PS: owns the DRAM (`blk_mem_gen` 32b x 50176) and replays
+`tester.v` models the PS: owns the DRAM (`blk_mem_gen` 32b x 65536) and replays
 a CSR program stored in that same DRAM at `PROG_BASE`. Two words per entry
 (addr, data); `4'hF` pulses start and waits for done, `4'hE` ends the program.
 This is a design source, not a testbench, and carries over unchanged.
 
 IP cores: `blk_mem_gen_0` (ibuf bank 32b x 32), `blk_mem_gen_1` (wbuf bank
 32b x 32), `blk_mem_gen_2` (obuf bank 32b x 64), `blk_mem_acc` (24b x 1024),
-`dram` (32b x 50176, **needs 65,536**). All single port, WRITE_FIRST, output
+`dram` (32b x 65536). All single port, WRITE_FIRST, output
 register off.
 
-Task 1 DRAM map (to be reworked for CNN sizes): W 0x0000-0x6900, INPUT 0x7000,
-BN 0x9000, ACT1-4 0xA000/0xA800/0xB000/0xB800, OUT 0xC000, PROG 0xC300.
+The CNN DRAM map is in section 7; Task 1's map (W 0x0000, BN 0x9000, PROG
+0xC300) does not apply.
 
 ---
 

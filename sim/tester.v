@@ -2,7 +2,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 // Module : tester     (synthesizable model of the PS : DRAM + CSR sequencer)
 //
-//   Owns the DRAM (blk_mem_gen `dram`, 32b x 50176, single port, latency 1) and
+//   Owns the DRAM (blk_mem_gen `dram`, 32b x 65536, single port, latency 1) and
 //   runs a sequencer that replays a CSR program stored IN THAT SAME DRAM.
 //
 //   DRAM port A is shared three ways, priority host > csr-fetch > dma :
