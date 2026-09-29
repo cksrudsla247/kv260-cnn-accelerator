@@ -29,9 +29,9 @@
 //
 //     Conv1_1 0   Conv1_2 2   Conv2_1 3   Conv2_2 2   Conv3 3
 //
-//   Measured on 500 MNIST images: forcing every layer to s1 = 2 gives 81.6%
+//   Measured on 500 MNIST images: forcing every layer to s1 = 2 gives 79.8%
 //   against 98.6% with the per-layer shift, because Conv1_1's `a` saturates the
-//   4-bit field. 17 points is not a rounding difference, so the shift comes in
+//   4-bit field. 19 points is not a rounding difference, so the shift comes in
 //   from the CSR now (CSR8[14:13]).
 //////////////////////////////////////////////////////////////////////////////////
 module batch_norm#(

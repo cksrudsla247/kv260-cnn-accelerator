@@ -244,7 +244,7 @@ A software infinite loop can always be halted. A core that cannot be halted is *
 | hypothesis | test | result |
 |---|---|---|
 | `s_axi` accidentally disconnected | `get_bd_intf_pins -of_objects [get_bd_intf_nets -of_objects [get_bd_intf_pins top_kv260_0/s_axi]]` | connected to `ps8_0_axi_periph/M00_AXI` — rejected. (A first query with `get_bd_nets` on individual signals returned nothing and looked like a disconnect; `s_axi` is a **bus interface pin**, whose individual signals have no nets of their own. `get_bd_intf_*` is required — false alarm.) |
-| timing violation | post-route Timing Summary | WNS +2.052 ns, WHS +0.014 ns, 0 failing endpoints — rejected |
+| timing violation | post-route Timing Summary | 0 failing endpoints (final routed design: WNS +1.652 ns, WHS +0.012 ns) — rejected |
 | AXI width converter (`M_AXI_HPM0_FPD` 128-bit → 32-bit AXI-Lite via `auto_ds`, with recurring `AWUSER_WIDTH` mismatch warnings) | set HPM0 FPD data width to 32 bits, rebuilt | identical symptom — rejected |
 | PS-PL isolation | ran `psu_ps_pl_isolation_removal` / `psu_ps_pl_reset_config` from `psu_init.tcl` in XSCT | no change — **but this test was invalid**: it was run after the CPU had already hung, and an in-flight stalled transaction cannot be recovered. Revisited in §9. |
 
@@ -376,13 +376,13 @@ All 6 layers done in 68846 us
 
 | layer | on board | sim, AXI BFM (0–5 cycle latency)\* | sim, BRAM-direct (1-cycle memory) |
 |---|---:|---:|---:|
-| Conv1_1 | 3.11 ms | ~1.2 ms | 0.12 ms |
-| Conv1_2 | 19.54 ms | ~5.5 ms | 0.68 ms |
-| Conv2_1 | 11.06 ms | ~3.4 ms | 0.43 ms |
-| Conv2_2 | 20.80 ms | ~6.0 ms | 0.80 ms |
-| Conv3 | 12.55 ms | ~3.7 ms | 0.53 ms |
-| Affine | 1.52 ms | ~0.35 ms | 0.06 ms |
-| **total** | **68.8 ms** | **~20 ms** | **2.61 ms** |
+| Conv1_1 | 3.11 ms | ~1.2 ms | 0.34 ms |
+| Conv1_2 | 19.54 ms | ~5.5 ms | 1.30 ms |
+| Conv2_1 | 11.06 ms | ~3.4 ms | 0.84 ms |
+| Conv2_2 | 20.80 ms | ~6.0 ms | 1.45 ms |
+| Conv3 | 12.55 ms | ~3.7 ms | 0.90 ms |
+| Affine | 1.52 ms | ~0.35 ms | 0.10 ms |
+| **total** | **68.8 ms** | **~20 ms** | **4.94 ms** |
 
 \* estimated from `tb_top_kv260.v` cumulative cycle counts at layer boundaries.
 

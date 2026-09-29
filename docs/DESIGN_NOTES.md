@@ -22,18 +22,20 @@ is complete and verified; this is the CNN follow-on that reuses its datapath.
 
 ## 2. Hardware, as built and synthesised
 
-The PE array was **1024 PE (32x32) and did not fit**: 95,756 LUT = 180% of the
+The PE array was **1024 PE (32x32) and did not fit**: 95,461 LUT = 179.44% of the
 53,200 available. Measured cost is ~62 LUT per 8x8 multiplier plus ~20 LUT per
 adder-tree node; DSP inference does not help because only ~124 DSP slices are
 free and there are 1024 multipliers.
 
-Synthesised sweep on XC7Z020:
+Utilisation on XC7Z020 (from the Vivado reports that are still on disk):
 
-| array | PE   | LUT   | verdict |
-|-------|------|-------|---------|
-| 32x32 | 1024 | 180%  | no      |
-| 16x32 | 512  | 101%  | no      |
-| **8x32** | **256** | **61%** | **confirmed** |
+| array | PE   | LUT   | stage | verdict |
+|-------|------|-------|-------|---------|
+| 32x32 | 1024 | 95,461 = 179.44% | synthesis | no |
+| **8x32** | **256** | **37,622 = 70.72%** | **post-route** | **confirmed** |
+
+The 8x32 XC7Z020 run did **not** meet 100 MHz (WNS -0.936 ns). Timing closure
+was reached on the KV260 (xck26): WNS +1.652 ns, LUT 37,294 = 31.84%.
 
 ### Confirmed parameters
 
@@ -418,11 +420,13 @@ The theoretical bound is ~100x pessimistic: ReLU'd activations and real weights
 never hit +-127 together. **No change needed.**
 
 ```
-S1 = 2 compiled in   forced      : 81.6% integer accuracy
-                     per-layer   : 98.6%   (float on the same images: 98.4%)
+                     first 500 images   full 10,000
+S1 = 2 compiled in   forced      : 79.8%            79.97%   integer accuracy
+                     per-layer   : 98.6%            99.17%
+                     float       : 98.4%            99.13%
 ```
 
-**17 points, so S1 became a CSR field.** See section 12.
+**19 points, so S1 became a CSR field.** See section 12.
 
 Per-layer values the quantiser produces:
 
@@ -562,21 +566,23 @@ Three decisions worth keeping:
 ### The whole network is bit-exact
 
 ```
->>> PASS : bit-exact (928 words)     tb_top, 260,816 cycles, 6 layers
+>>> PASS : bit-exact (928 words)     tb_top, 494,322 cycles, 6 layers
 ```
 
 | layer | cycles | cumulative |
 |-------|--------|-----------|
-| Conv1_1 | 11,512 | 11,512 |
-| Conv1_2 | 67,559 | 79,071 |
-| Conv2_1 | 43,367 | 122,438 |
-| Conv2_2 | 80,033 | 202,471 |
-| Conv3 | 52,621 | 255,092 |
-| Affine | 5,724 | 260,816 |
+| Conv1_1 | 34,060 | 34,060 |
+| Conv1_2 | 129,822 | 163,882 |
+| Conv2_1 | 84,386 | 248,268 |
+| Conv2_2 | 145,106 | 393,374 |
+| Conv3 | 90,322 | 483,696 |
+| Affine | 10,430 | 494,126 |
 
-**2.61 ms @ 100 MHz**, against the 2.49 ms the `tb_controller` model predicted;
-the estimate was 5% low, evenly across layers. Section 2's table is the model,
-this one is measured through `tb_top` with real data.
+**4.94 ms @ 100 MHz**, measured through `tb_top` with real data (Icarus and
+Vivado XSim agree to the cycle). The `tb_controller` model in section 2 predicts
+2.49 ms because it assumes one DRAM word per cycle; the current `dma.v` is a
+variable-latency handshake (written for the AXI4 path) and spends 2-3 cycles per
+word even on a 1-cycle BRAM.
 
 The golden set checks only what is still live when the program ends, because the
 activation ping-pong overwrites each layer's output two layers later: Conv3's
@@ -719,7 +725,7 @@ bugs are worth keeping:
   `batch_norm.v` had `parameter S1 = 2` because every MLP layer landed there,
   and `quant_final2.py` even asserts it. The CNN's five conv layers want
   `0, 2, 3, 2, 3`: Conv1_1's `a` saturates the 4-bit field at s1=2 and integer
-  accuracy drops from 98.6% to **81.6%**. `S1` is now `i_s1`, an input driven
+  accuracy drops from 98.6% to **79.8%** (500 images; 99.17% to 79.97% on all 10,000). `S1` is now `i_s1`, an input driven
   from CSR8[14:13]. The lesson is not about this one constant — it is that a
   quantisation format validated against one network is not validated, and the
   check costs one script.
@@ -833,7 +839,7 @@ blocks folded into channels), which also *improved* accuracy by ~4%; AWS has a
 patent on mapping several filter taps onto several rows, which is what the
 im2col path here does.
 
-Conv1_1 spends ~80% of its cycles on DRAM transfer, not compute. **Raising PE
+Conv1_1 spends ~96% of its cycles with the DMA busy (32,813 of 34,060 in `tb_top`), not computing. **Raising PE
 utilisation there buys almost nothing** — splitting the adder tree three ways
 would gain 4%, while space-to-depth (2x2 -> 4 channels) cuts the layer 73% by
 shrinking the data. That is the improvement to write up, and to implement only

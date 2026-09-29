@@ -365,14 +365,15 @@ model, in one run of one CSR program:
 
 | layer | cycles | cumulative |
 |-------|--------|-----------|
-| Conv1_1 | 11,512 | 11,512 |
-| Conv1_2 | 67,559 | 79,071 |
-| Conv2_1 | 43,367 | 122,438 |
-| Conv2_2 | 80,033 | 202,471 |
-| Conv3 | 52,621 | 255,092 |
-| Affine | 5,724 | 260,816 |
+| Conv1_1 | 34,060 | 34,060 |
+| Conv1_2 | 129,822 | 163,882 |
+| Conv2_1 | 84,386 | 248,268 |
+| Conv2_2 | 145,106 | 393,374 |
+| Conv3 | 90,322 | 483,696 |
+| Affine | 10,430 | 494,126 |
 
-**260,816 cycles = 2.61 ms @ 100 MHz.** `>>> PASS : bit-exact (928 words)`.
+`all_done` at **494,322 cycles = 4.94 ms @ 100 MHz.** `>>> PASS : bit-exact (928 words)`.
+Identical cycle counts in Icarus Verilog and Vivado 2022.1 XSim.
 
 The golden set covers only the regions still live at the end of the program,
 because the activation ping-pong overwrites each layer's output two layers

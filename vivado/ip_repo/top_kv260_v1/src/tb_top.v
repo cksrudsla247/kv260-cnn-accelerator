@@ -13,8 +13,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 module tb_top;
  
-    // MUST match the `dram` IP depth. The CNN needs 60,352 words (43,904 of
-    // weights alone), so the IP has to be regenerated at 65,536 - which is also
+    // MUST match the `dram` IP depth. The CNN's map ends at 0xEAC0 (60,096
+    // words; 38,784 of weights), so the IP has to be regenerated at 65,536 - which is also
     // the ceiling, because every DRAM address in this design is [15:0].
     localparam DRAM_DEPTH = 65536;
     localparam GMAX       = 8192;    // Conv1_1 alone emits 6,272 words

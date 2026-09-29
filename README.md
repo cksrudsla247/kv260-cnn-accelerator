@@ -5,7 +5,7 @@
 > ### Status — **Running on hardware**
 > | stage | result |
 > |---|---|
-> | RTL simulation, BRAM-direct (`tb_top`) | 928/928 bit-exact, 260,816 cycles |
+> | RTL simulation, BRAM-direct (`tb_top`) | 928/928 bit-exact, 494,322 cycles |
 > | RTL simulation, full board topology over AXI (`tb_top_kv260`) | 928/928 bit-exact |
 > | Synthesis + place & route on **xck26 (KV260)** | timing met, WNS **+1.652 ns** @ 100 MHz |
 > | **On-board, KV260 bare-metal** | **928/928 bit-exact, 68.8 ms / image** |
@@ -146,7 +146,7 @@ for ft:                              output-channel tile  (COL_SIZE = 32 at a ti
 ```
 
 Key points:
-- **PE array 8x32** chosen by a synthesis sweep (32x32 = 180% LUT on XC7Z020, 8x32 = 61%).
+- **PE array 8x32**: 32x32 needs 179% of the XC7Z020's LUTs; 8x32 uses 70.7% there and 31.8% on the KV260.
 - **Row streaming**: only one input row per channel group is live, so ibuf depth = W (28)
   instead of 3,136 rows. ibuf ping-pong is load-bearing, not an optimisation.
 - **Maxpool fused** into the drain after requant (monotonic, bit-identical, 8-bit compare).
@@ -161,11 +161,12 @@ Key points:
 
 | testbench | what it checks | result |
 |---|---|---|
-| `tb_top` | full 6-layer network, `tester.v` + BRAM DRAM, vs `quant_cnn.py` | **928/928**, 260,816 cycles |
+| `tb_top` | full 6-layer network, `tester.v` + BRAM DRAM, vs `quant_cnn.py` | **928/928**, 494,322 cycles (Icarus and XSim) |
 | `tb_top_kv260` | full board topology: AXI-Lite CSR driven like PS software + AXI4 DDR slave BFM with random latency | **928/928** |
 | `tb_axi4_dma` | `dma.v` + `axi4_master_dram.v` vs random-latency AXI4 slave, independent AW/W ordering | PASS, 708 words over 50 rounds |
 | `tb_axi_lite_csr` | 200 randomised AXI-Lite writes, back-pressure, done-register readback | PASS |
-| `tb_accumulator`, `tb_maxpool`, `tb_controller`, ... | module level | PASS |
+| `tb_accumulator`, `tb_maxpool` | module level | PASS |
+| `tb_controller` | controller alone against a behavioural DMA | out of date: reports 54 problems against the current `controller.v`, which passes end to end in `tb_top` |
 
 Every testbench is **mutation-tested** — the DUT is deliberately broken and the test
 must fail. A test that has never failed has not been shown to test anything.
@@ -178,17 +179,17 @@ against the golden model. **928/928 match.**
 
 | layer | on board | BRAM-direct sim (ideal memory) |
 |---|---:|---:|
-| Conv1_1 | 3.11 ms | 0.12 ms |
-| Conv1_2 | 19.54 ms | 0.68 ms |
-| Conv2_1 | 11.06 ms | 0.43 ms |
-| Conv2_2 | 20.80 ms | 0.80 ms |
-| Conv3 | 12.55 ms | 0.53 ms |
-| Affine | 1.52 ms | 0.06 ms |
-| **total** | **68.8 ms** | **2.61 ms** |
+| Conv1_1 | 3.11 ms | 0.34 ms |
+| Conv1_2 | 19.54 ms | 1.30 ms |
+| Conv2_1 | 11.06 ms | 0.84 ms |
+| Conv2_2 | 20.80 ms | 1.45 ms |
+| Conv3 | 12.55 ms | 0.90 ms |
+| Affine | 1.52 ms | 0.10 ms |
+| **total** | **68.8 ms** | **4.94 ms** |
 
 **Every layer is memory-bound.** `axi4_master_dram.v` issues single-beat AXI4
 transactions, so each DDR word pays a full round trip to the PS DDR controller.
-The same datapath with ideal single-cycle memory takes 2.61 ms — **AXI4 burst
+The same datapath with ideal single-cycle memory takes 4.94 ms — **AXI4 burst
 transfers are the next step** and the largest available speed-up.
 
 ---
