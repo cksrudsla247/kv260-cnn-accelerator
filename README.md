@@ -110,7 +110,7 @@ top_kv260.v               board top: AXI-Lite CSR slave + AXI4 DDR master around
               +-- bank_unpack.v     x2 : bank words -> flat INT8 byte lanes
               +-- pe_array_hier.v   8 rows x 32 cols, weight-stationary
               |     +-- pe_adder_tree.v -> pe_col.v -> PE.v -> multiplier.v
-              |                        \-> adder_tree.v -> rca.v -> full_adder.v
+              |                        \-> adder_tree.v
               +-- accumulator.v     32 lanes x 24b x 1024 slots, 1 BRAM per lane
               +-- bn_regfile.v      384 channels of (A,B) as 12 groups of 32
               +-- batch_norm.v      (acc * A >> s1) + B
@@ -150,7 +150,8 @@ Key points:
 - **Row streaming**: only one input row per channel group is live, so ibuf depth = W (28)
   instead of 3,136 rows. ibuf ping-pong is load-bearing, not an optimisation.
 - **Maxpool fused** into the drain after requant (monotonic, bit-identical, 8-bit compare).
-- **No `*` operator** in the MAC datapath: Baugh-Wooley signed multiplier + hand-written RCA.
+- **No `*` operator** in the MAC datapath: Baugh-Wooley signed multiplier; its partial
+  products and the adder tree are summed with `+`.
 
 ---
 
