@@ -42,9 +42,10 @@ tester.v                  models the PS. Owns the DRAM (blk_mem_gen 32b x 65536)
               +-- weight_buffer.v   wbuf : NB_W=8 banks x 32b x 32, ping-pong
               +-- bank_unpack.v     x2 : bank words -> flat byte lanes
               +-- pe_array_hier.v   8 rows x 32 cols, weight-stationary
-              |     +-- pe_col.v          one output channel
-              |           +-- PE.v        multiplier + weight register
-              |           +-- pe_adder_tree.v
+              |     +-- pe_adder_tree.v   one output channel (x32)
+              |           +-- pe_col.v    8 PEs of that column
+              |           |     +-- PE.v  weight register + multiplier.v
+              |           +-- adder_tree.v  sums the 8 products
               +-- accumulator.v     32 lanes x 24b x 1024 slots, 1 BRAM per lane
               +-- bn_regfile.v      384 channels of (A,B) as 12 groups of 32
               +-- batch_norm.v      (acc * A >> s1) + B
@@ -54,9 +55,9 @@ tester.v                  models the PS. Owns the DRAM (blk_mem_gen 32b x 65536)
               +-- output_buffer.v   obuf : NB_OUT=8 banks x 32b x 64, ping-pong
 ```
 
-`pe_array.v`, `adder_tree.v`, `rca.v`, `full_adder.v`, `ha_adder.v`, `mux2.v`,
-`multiplier.v` and `batch_norm_array.v` are Task-1 leaf cells and alternates;
-the active path is the `_hier` one.
+`multiplier.v` is a Baugh-Wooley signed multiplier; it and `adder_tree.v` sum
+with `+`. Unused Task-1 cells (a ripple-carry adder, a flat `pe_array.v`,
+`batch_norm_array.v`, `mux2.v`) are not part of this repository.
 
 ---
 
@@ -393,7 +394,8 @@ Module level: `tb_accumulator` 384 comparisons, `tb_maxpool` 10,688,
   will find them.
 - `mkdebug.py` — preload a known-good activation into ACT_A and run ONE
   synthetic layer over it: `--taps center|nopad|full`, `--ct N`.
-- `probe.py` / `probe4.py` — identity weights and a no-op BN, so **the output
+  (One-off script, not kept in this repository.)
+- `probe.py` / `probe4.py` (one-off scripts, not kept) — identity weights and a no-op BN, so **the output
   byte IS the input byte the hardware fetched**, and the input values encode
   their own coordinates. Reads the address generator out directly.
 - `analyze_got.py` — the structure of a mismatch: per row, per column, per

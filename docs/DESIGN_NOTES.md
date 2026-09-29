@@ -674,10 +674,11 @@ bugs are worth keeping:
 - `--debug-nopool` forces `pool_en=0` on the last layer and checks the un-pooled
   map. Separates a reduction bug from a maxpool bug, and the result is
   invertible back to accumulator values where a pooled map is not.
-- `mkdebug.py` preloads a known-good activation into ACT_A and runs ONE
+- `mkdebug.py` (one-off, not kept in this repository) preloads a known-good
+  activation into ACT_A and runs ONE
   synthetic layer over it: `--taps center|nopad|full`, `--ct N`. Conv1_1 out of
   the picture, one feature at a time.
-- `probe.py` / `probe4.py` make the weights an IDENTITY - one output channel
+- `probe.py` / `probe4.py` (one-off, not kept) make the weights an IDENTITY - one output channel
   picks one (group, tap) with weight 1 - and BN a no-op (A=1, B=0, s1=s2=0,
   M2=1), so **the output byte IS the input byte the hardware fetched**. The
   input values encode their own coordinates, so a wrong address reads back as a
