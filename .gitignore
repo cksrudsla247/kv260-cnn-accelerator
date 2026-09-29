@@ -1,0 +1,34 @@
+# Vivado / Vitis generated output
+*.runs/
+*.cache/
+*.gen/
+*.hw/
+*.ip_user_files/
+*.sim/
+.Xil/
+*.jou
+*.log
+*.str
+*.backup.*
+webtalk*
+xsim.dir/
+*.wdb
+*.pb
+
+# build products (regenerate, see README)
+*.bit
+*.xsa
+*.elf
+*.vvp
+sw/kv260_test/src/dram_img.h
+sw/kv260_test/src/gold.h
+
+# python
+__pycache__/
+*.pyc
+*.npy
+
+# editor / backups
+*.bak
+*~
+.vscode/
