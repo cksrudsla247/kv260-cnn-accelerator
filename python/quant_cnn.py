@@ -285,7 +285,7 @@ def layer_csr(e, bn_grp, H, W, OH, OW, C_pad, in_base, out_base,
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--t2", default=os.environ.get("T2_DIR"),
-                    help='the "Task 2" directory holding params_hw.pkl')
+                    help='a clone of mnist-cnn-from-scratch (holds params_hw.pkl and 04_CNN/)')
     ap.add_argument("--out", default=os.path.dirname(os.path.abspath(__file__)))
     ap.add_argument("--img", type=int, default=-1,
                     help="test image index; -1 picks the first one the "

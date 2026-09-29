@@ -870,10 +870,11 @@ Affine. Batch now lives at the CSR-program level: change `in_base`, replay.
 
 ## 14. Layout and files
 
-Working dir: `<rtl_proj>/`. Python under `<Task2>/04_CNN/`.
+Working dir: `<rtl_proj>/`. Model code under `<mnist-cnn-from-scratch>/04_CNN/`
+(https://github.com/cksrudsla247/mnist-cnn-from-scratch).
 
 Python: `python/quant_cnn.py`. Run it with
-`--t2 "<Task2>"`; it writes `dram.txt`, `gold.txt`,
+`--t2 "<mnist-cnn-from-scratch>" --upto Affine`; it writes `dram.txt`, `gold.txt`,
 `gold_addr.txt` and `quant.json` next to itself, which is where `tb_top` looks
 for them when the simulation runs from that directory.
 
@@ -907,11 +908,11 @@ The RTL side fixes the contract, so this is a specification, not a design task.
 ### The trained network already exists
 
 ```
-<Task2>/params_hw.pkl
+<mnist-cnn-from-scratch>/params_hw.pkl
 ```
 
 Note the location: one level ABOVE `04_CNN/`, because `run_hw.py` uses the
-relative path `PKL = "params_hw.pkl"` and was run from `Task 2/`. Verified by
+relative path `PKL = "params_hw.pkl"` and was run from the repository root. Verified by
 inference on 2026-08-24:
 
 ```

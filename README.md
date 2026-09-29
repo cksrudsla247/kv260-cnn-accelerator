@@ -246,8 +246,16 @@ run `tb_top` or `tb_top_kv260`.
 3. Run `sw/kv260_test/gen_headers.sh` to produce `dram_img.h` and `gold.h`.
 4. Build, run over JTAG, watch the UART (115200 8N1).
 
-`python/quant_cnn.py` regenerates `dram.txt` / `gold*.txt` from the trained
-parameters (`params_hw.pkl`, not included) via `--t2 <dir>`.
+`python/quant_cnn.py` regenerates `dram.txt` / `gold*.txt` from the trained network
+in [mnist-cnn-from-scratch](https://github.com/cksrudsla247/mnist-cnn-from-scratch)
+(NumPy model code + `params_hw.pkl`):
+
+```bash
+git clone https://github.com/cksrudsla247/mnist-cnn-from-scratch
+python python/quant_cnn.py --t2 mnist-cnn-from-scratch --upto Affine
+```
+
+The output is bit-identical to the committed `dram.txt`, `gold.txt` and `gold_addr.txt`.
 
 ---
 
