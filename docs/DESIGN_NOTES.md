@@ -1,6 +1,6 @@
 # Task 2 — CNN accelerator on Zedboard (XC7Z020)
 
-Context file for continuing this project in Claude Code. Task 1 (MLP accelerator)
+Task 1 (MLP accelerator)
 is complete and verified; this is the CNN follow-on that reuses its datapath.
 
 ---
@@ -13,7 +13,6 @@ is complete and verified; this is the CNN follow-on that reuses its datapath.
 - Every RTL change is verified bit-exact against a Python golden model. A
   mismatch is almost always a Python layout bug or an RTL timing bug, never
   quantisation noise.
-- Prefer complete file rewrites over incremental diffs when a file changes a lot.
 - Every module gets a standalone testbench, and every testbench gets
   **mutation-tested**: break the DUT deliberately and confirm the test fails.
   A test that has never failed has not been shown to test anything. This has
@@ -844,12 +843,12 @@ after the pipeline works.
 than half their cycles on tile setup because `OH*OW` is 49 and 1. The same
 pattern shows up everywhere in this design: batch parallelism, array shape, and
 prefetch placement all come down to whether `P` is large enough to amortise
-something. Worth one paragraph in the report.
+something.
 
 **Affine wants the opposite array shape.** Per-layer optimum analysis at equal PE
 count: conv layers prefer wide columns, Affine prefers wide rows, by 3.8x. Fixing
 one array costs ~10% overall. This is the quantitative case for why DNPU splits
-CNN and FC/RNN into separate reconfigurable processors — worth a report section.
+CNN and FC/RNN into separate reconfigurable processors.
 
 **The batch (N) loop was removed.** In the MLP it existed to keep the
 accumulator at 32 registers; in the CNN the pixel loop took over that role, and
@@ -865,11 +864,10 @@ Affine. Batch now lives at the CSR-program level: change `in_base`, replay.
 
 ## 14. Layout and files
 
-Working dir: `<rtl_proj>/`. Python under `Task 2/04_CNN/`
-(Anaconda on Windows, `python` not `python3`).
+Working dir: `<rtl_proj>/`. Python under `<Task2>/04_CNN/`.
 
-Python: `Task_1_26_summer.srcs/python/quant_cnn.py`. Run it with
-`--t2 "<...>/2025 Winter Intern/Task 2"`; it writes `dram.txt`, `gold.txt`,
+Python: `python/quant_cnn.py`. Run it with
+`--t2 "<Task2>"`; it writes `dram.txt`, `gold.txt`,
 `gold_addr.txt` and `quant.json` next to itself, which is where `tb_top` looks
 for them when the simulation runs from that directory.
 
@@ -900,7 +898,7 @@ BN 0x9000, ACT1-4 0xA000/0xA800/0xB000/0xB800, OUT 0xC000, PROG 0xC300.
 
 The RTL side fixes the contract, so this is a specification, not a design task.
 
-### The trained network already exists - do NOT retrain
+### The trained network already exists
 
 ```
 <Task2>/params_hw.pkl
