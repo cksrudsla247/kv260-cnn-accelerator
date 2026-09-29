@@ -2,17 +2,13 @@
 
 **INT8 weight-stationary CNN accelerator for MNIST — running on real Kria KV260 hardware, bit-exact (928/928) against a Python integer model across all 6 layers.**
 
-**MNIST용 INT8 weight-stationary CNN 가속기. 실제 Kria KV260 보드에서 6개 레이어 전체가 Python 정수 모델과 bit-exact(928/928) 일치함을 확인.**
-
-> ### Status / 진행 상태 — **Running on hardware**
+> ### Status — **Running on hardware**
 > | stage | result |
 > |---|---|
 > | RTL simulation, BRAM-direct (`tb_top`) | 928/928 bit-exact, 260,816 cycles |
 > | RTL simulation, full board topology over AXI (`tb_top_kv260`) | 928/928 bit-exact |
 > | Synthesis + place & route on **xck26 (KV260)** | timing met, WNS **+1.652 ns** @ 100 MHz |
 > | **On-board, KV260 bare-metal** | **928/928 bit-exact, 68.8 ms / image** |
->
-> **RTL 시뮬레이션 → 합성·배치배선 → 실보드**까지 전 단계 완료. 실보드 결과가 시뮬레이션과 비트 단위로 동일합니다.
 
 ```
 === KV260 CNN accelerator : full 6-layer run ===
@@ -30,7 +26,7 @@ All 6 layers done in 68846 us
 
 ---
 
-## 1. Overview / 개요
+## 1. Overview
 
 A single **layer engine**: given 10 CSR registers describing one layer plus a DRAM
 holding weights, BN constants and input activations, it streams the layer in,
@@ -38,17 +34,11 @@ computes `OH x OW x FN` results into an on-chip accumulator, pushes them through
 BN -> ReLU -> requant -> maxpool, writes INT8 activations back to DRAM, then pulses
 `done`. A whole network is that program replayed six times with different CSR values.
 
-한 번에 **한 레이어**를 처리하는 엔진입니다. CSR 레지스터 10개로 레이어를 기술하면
-가중치·BN 상수·입력 액티베이션을 DRAM에서 스트리밍해 `OH x OW x FN`개의 결과를
-온칩 누산기에 쌓고, BN -> ReLU -> requant -> maxpool 경로를 통과시켜 INT8 액티베이션을
-DRAM에 되쓴 뒤 `done`을 펄스합니다. 네트워크 전체는 CSR 값만 바꿔 이 프로그램을
-6번 재생하는 것입니다.
-
 The PE array itself is just a **vector-matrix multiplier**: 8 bytes in, an 8x32
 weight tile held in registers, 32 partial sums out. Everything that makes it a
 convolution lives in the address generator inside `controller.v`.
 
-### Target network / 대상 네트워크
+### Target network
 
 VGG-style, every conv 3x3 stride 1, pooling only at stage ends.
 Trained in NumPy — **99.13% on MNIST** in float.
@@ -66,7 +56,7 @@ Affine   512 ->  10
 
 ---
 
-## 2. System on KV260 / KV260 시스템 구성
+## 2. System on KV260
 
 ```
  Zynq UltraScale+ PS (Cortex-A53, bare-metal)
@@ -91,7 +81,7 @@ Affine   512 ->  10
 | PL clock | `pl_clk0` = 100 MHz |
 | Reset | `proc_sys_reset.peripheral_reset` (active-high) → `top_kv260.rst`; `dcm_locked` tied to 1 |
 
-### Resource usage on xck26 (post-placement) / 리소스 사용량
+### Resource usage on xck26 (post-placement)
 
 | resource | used | available | util. |
 |---|---:|---:|---:|
@@ -105,7 +95,7 @@ Timing met at 100 MHz: **WNS +1.652 ns, WHS +0.012 ns, 0 failing endpoints.**
 
 ---
 
-## 3. Architecture / 아키텍처
+## 3. Architecture
 
 ```
 top_kv260.v               board top: AXI-Lite CSR slave + AXI4 DDR master around top.v
@@ -138,10 +128,7 @@ multiplier, bit widths, memory layouts, BRAM latency discipline — are in
 [`docs/DATAFLOW.md`](docs/DATAFLOW.md), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 and [`docs/DESIGN_NOTES.md`](docs/DESIGN_NOTES.md).
 
-설계 상세(데이터플로우, row streaming, maxpool 융합, 게이트 레벨 곱셈기, 비트폭,
-메모리 레이아웃, BRAM 지연 규율)는 `docs/`의 세 문서에 있습니다.
-
-### Dataflow / 데이터플로우
+### Dataflow
 
 ```
 for ft:                              output-channel tile  (COL_SIZE = 32 at a time)
@@ -158,7 +145,7 @@ for ft:                              output-channel tile  (COL_SIZE = 32 at a ti
   drain: acc -> BN -> ReLU -> requant -> maxpool -> obuf -> s2mm
 ```
 
-Key points / 핵심 포인트:
+Key points:
 - **PE array 8x32** chosen by a synthesis sweep (32x32 = 180% LUT on XC7Z020, 8x32 = 61%).
 - **Row streaming**: only one input row per channel group is live, so ibuf depth = W (28)
   instead of 3,136 rows. ibuf ping-pong is load-bearing, not an optimisation.
@@ -167,7 +154,7 @@ Key points / 핵심 포인트:
 
 ---
 
-## 4. Verification / 검증
+## 4. Verification
 
 ### 4.1 Simulation
 
@@ -182,9 +169,7 @@ Key points / 핵심 포인트:
 Every testbench is **mutation-tested** — the DUT is deliberately broken and the test
 must fail. A test that has never failed has not been shown to test anything.
 
-모든 테스트벤치는 **뮤테이션 테스트**를 거쳤습니다(DUT를 일부러 망가뜨려 실패하는지 확인).
-
-### 4.2 On hardware / 실보드
+### 4.2 On hardware
 
 `sw/kv260_test` loads the DRAM image (input + weights + BN + CSR program) into DDR,
 replays the CSR program exactly like `tb_top_kv260`, and compares the 928 output words
@@ -205,13 +190,9 @@ transactions, so each DDR word pays a full round trip to the PS DDR controller.
 The same datapath with ideal single-cycle memory takes 2.61 ms — **AXI4 burst
 transfers are the next step** and the largest available speed-up.
 
-**모든 레이어가 메모리 병목입니다.** `axi4_master_dram.v`가 단일 워드 AXI4 트랜잭션만
-내기 때문에 워드마다 PS DDR 컨트롤러 왕복 지연을 그대로 냅니다. 같은 데이터패스가
-이상적 메모리에서는 2.61ms → **AXI4 버스트 전송이 다음 작업이자 가장 큰 개선 포인트**입니다.
-
 ---
 
-## 5. Bring-up story / 브링업 과정
+## 5. Bring-up story
 
 Getting from "passes in simulation" to "passes on the board" surfaced bugs that no
 simulation had exercised. Full write-ups with evidence:
@@ -231,13 +212,9 @@ registers (`GPIO DATA_5` bit 31 = `pl_resetn0` still asserted). Fixed in the
 application by replaying `psu_ps_pl_isolation_removal` / `psu_ps_pl_reset_config`
 from `psu_init`.
 
-**보드 멈춤의 근본 원인:** JTAG 전용 플로우에서는 FSBL이 PS-PL isolation 해제와
-`pl_resetn0` 해제를 하지 않습니다(부팅 이미지에서 PL 파티션을 로드할 때만 수행).
-그래서 PL로 가는 모든 AXI 접근이 무응답이었고, CPU는 halt조차 안 되는 상태로 멈췄습니다.
-
 ---
 
-## 6. Repository layout / 저장소 구성
+## 6. Repository layout
 
 ```
 rtl/                synthesizable Verilog (26 modules + top_kv260, AXI adapters)
@@ -252,7 +229,7 @@ sw/kv260_test/      bare-metal test app: main.c, lscript.ld, gen_headers.sh
 docs/               ARCHITECTURE / DATAFLOW / DESIGN_NOTES / DMA_AXI_FIX / KV260_HW_BRINGUP
 ```
 
-## 7. Reproducing / 재현 방법
+## 7. Reproducing
 
 **Simulation** — add `rtl/`, `rtl/ip/`, `sim/`, `sim/ip/` to a Vivado project (or
 compile with Icarus using the `blk_mem_gen` behavioural models), put
@@ -272,7 +249,7 @@ parameters (`params_hw.pkl`, not included) via `--t2 <dir>`.
 
 ---
 
-## 8. Tools / 사용 툴
+## 8. Tools
 
 | | |
 |---|---|
@@ -282,7 +259,7 @@ parameters (`params_hw.pkl`, not included) via `--t2 <dir>`.
 | Simulation | Vivado xsim, Icarus Verilog |
 | Golden model / quantiser | Python 3 + NumPy |
 
-## 9. Known limitations / 알려진 한계
+## 9. Known limitations
 
 - **Memory-bound on hardware** (single-beat AXI4) — see §4.2. Burst transfers are next.
 - **JTAG bring-up only.** Standalone SD boot (BOOT.BIN) not yet done; there the FSBL
