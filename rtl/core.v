@@ -355,7 +355,13 @@ module core #(
         .dr_addr(wb_row_nxt), .dr_dout(obuf_rdata)
     );
 
-    // pick the requested 32-bit word out of the row
-    assign wb_data = obuf_rdata[wb_bank*32 +: 32];
+    // pick the requested 32-bit word out of the row. obuf_rdata is the row
+    // addressed LAST cycle (synchronous BRAM), so the word select has to be
+    // the bank of that same request, not of whatever wb_idx says now. dma.v
+    // holds wb_idx for several cycles and never noticed; a burst DMA that
+    // asks for a new word every cycle would pick the neighbouring word.
+    reg [BANK_BIT-1:0] wb_bank_d1;
+    always @(posedge clk) wb_bank_d1 <= wb_bank;
+    assign wb_data = obuf_rdata[wb_bank_d1*32 +: 32];
 
 endmodule
