@@ -1,5 +1,13 @@
 # CNN accelerator — design notes
 
+> **Version context:** this document is a design record containing earlier
+> experiments, estimates and timing assumptions. Current `controller.v` has
+> 22 states and an RD → WR → SUM → ACC pixel loop, with registered PE and post
+> paths. References below to a two-cycle pixel loop or combinational post path
+> do not describe the current scheduling. Use `ARCHITECTURE.md` for that map.
+> Recorded 928-word results cover surviving end-of-run regions, not all
+> intermediate tensors. Historical logs are retained, not rerun by this update.
+
 Developed and first synthesised for the Zedboard (XC7Z020, Vivado 2019.2), then
 brought up on the Kria KV260 (xck26, Vivado / Vitis 2022.1). Sections 2-15 are
 the design record from the XC7Z020 phase; board results are in

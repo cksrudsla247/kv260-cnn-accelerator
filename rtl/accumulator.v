@@ -30,19 +30,20 @@
 //     acc_en=1, acc_ph=0, acc_first=0   -> read the slot
 //     acc_en=1, acc_ph=1                -> write back old + pe
 //
-//   acc_addr and i_pe_result must HOLD across both cycles of a RMW; acc_first
-//   is ignored while acc_ph is high. Holding costs nothing: the PE array is
-//   combinational, so holding ibuf_raddr holds pe_result too.
+//   Keep acc_addr on the same slot through the read/write phases and present
+//   a valid i_pe_result for the write phase. acc_first is ignored while
+//   acc_ph is high. The surrounding PE path is registered; controller.v
+//   schedules RD/WR/SUM/ACC so the write consumes the aligned PE result.
 //
 //   The read issued at the end of the acc_ph=0 cycle lands on douta during the
 //   acc_ph=1 cycle (read latency 1, output register OFF), which is exactly when
 //   the adder needs it. The BRAM is WRITE_FIRST, but that only changes douta in
 //   the cycle AFTER the write, which nothing reads.
 //
-//   Conv1_1 has a single weight tile, so acc_first is high for every pixel and
-//   the accumulator runs at one pixel per cycle. From Conv1_2 on the (r,s)
-//   tiles accumulate and it is one pixel per two cycles - still far inside the
-//   weight DMA, so this costs nothing.
+//   This is the accumulator's local protocol, not whole-engine throughput.
+//   The current controller uses four pixel states even for a first-tile load.
+//   Conv1_1 is preprocessed into 16 im2col lanes (two 8-row reduction tiles),
+//   so it also accumulates across tiles rather than being a single-tile case.
 //
 // DRAIN
 //   dr_en / dr_addr read a slot without modifying it. o_accum_result is the

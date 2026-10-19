@@ -27,7 +27,7 @@
 //     NB_OUT = COL_SIZE*8/32     obuf row  = COL_SIZE bytes
 //
 //   A weight tile is ROW_SIZE x COL_SIZE INT8 = ROW_SIZE*NB_W DRAM words.
-//   At 8x32 that is 64 words, NOT the 256 the controller still assumes.
+//   At 8x32 that is 64 words; controller.v derives TILE_WORDS from the dimensions.
 //////////////////////////////////////////////////////////////////////////////////
 module core #(
     parameter ROW_SIZE     = 8,    // PE rows    : reduction width

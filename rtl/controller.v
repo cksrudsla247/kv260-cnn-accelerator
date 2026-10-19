@@ -42,11 +42,10 @@
 //
 //     ibuf rows needed = W        28 for Conv1_2, against a depth of 32
 //
-//   The cost is that each input row is re-read FH*FW times. That lands almost
-//   free because of an exact match: one ibuf row is NB_IN = 2 DRAM words, and
-//   one output pixel takes 2 cycles, so the load of row oh+1 hides completely
-//   underneath the pixel sweep of row oh. ibuf ping-pong is what makes that
-//   overlap possible and is therefore load-bearing, not an optimisation.
+//   Each input pixel of a channel group occupies NB_IN = 2 DRAM words.
+//   The current pixel loop takes four states: RD, WR, SUM, ACC. ibuf ping-pong
+//   permits the next-row load to overlap the sweep. Whether it is fully hidden
+//   depends on memory service time, especially on the single-beat DDR path.
 //
 // ACTIVATION LAYOUT IN DRAM   (C/ROW_SIZE, H, W, ROW_SIZE)
 //   Channel-group major, NOT pixel major. Group ct of row h is then contiguous:
@@ -61,17 +60,17 @@
 // BRAM LATENCY - the dominant bug source in this project
 //   Three places, all of them "address leads, consumer lags":
 //     wbuf -> PE      wbuf_raddr = push_cnt   , pe_row_addr = push_cnt_d1
-//     ibuf -> PE      ST_PIX_RD drives the address, ST_PIX_WR consumes the data
+//     ibuf -> PE      ST_PIX_RD drives the address; WR/SUM carry the PE pipeline
 //     acc  -> obuf    dr_en/dr_addr combinational, obuf_we/obuf_waddr registered
 //   ibuf_oob is registered on the ST_PIX_RD edge for exactly the same reason:
 //   the mask has to arrive with the data, not with the address.
 //
-// PIXEL TIMING   2 cycles, always
+// PIXEL TIMING   four-state loop in the current controller
 //   ST_PIX_RD   ibuf_raddr out; accumulator READ if this is not the first tile
-//   ST_PIX_WR   ibuf data (and therefore pe_result) valid; accumulator WRITE
-//   acc_first does not get a 1-cycle fast path: the PE result does not exist
-//   yet in the first cycle. Nothing is lost - the input DMA also needs 2 words
-//   per pixel, so 2 cycles per pixel is already the floor.
+//   ST_PIX_WR   ibuf data enters the registered PE path
+//   ST_PIX_SUM  PE / adder-tree pipeline
+//   ST_PIX_ACC  accumulator WRITE; acc_ph selects add versus first-tile load
+//   acc_first uses the same four states; it does not bypass the PE registers.
 //
 // GLOSSARY
 //   ft     output-channel tile : COL_SIZE channels           (was og)
@@ -203,13 +202,13 @@ module controller #(
         ST_ROW_WAIT  = 5'd8,
         ST_RSWAP     = 5'd9,   // hand the row to the PE, prefetch the next row
         ST_PIX_RD    = 5'd10,  // ibuf address out ; accumulator read
-        ST_PIX_WR    = 5'd11,  // ibuf data in     ; accumulator write
+        ST_PIX_WR    = 5'd11,  // ibuf data enters the registered PE path
         ST_PIX_SUM   = 5'd20,
-        ST_PIX_ACC   = 5'd21,  // PE result now valid (1-cycle PE pipeline) ; accumulator RMW happens here
+        ST_PIX_ACC   = 5'd21,  // registered PE/tree result valid; accumulator write
         ST_ROW_END   = 5'd12,  // wait for the row prefetch, then next oh
         ST_TILE_END  = 5'd13,  // advance fw / fh / ct, or go and drain
         ST_DRAIN     = 5'd14,  // accumulator -> post path -> obuf (pipelined)
-        ST_DR_TAIL   = 5'd15,  // one extra cycle : the last obuf write lags
+        ST_DR_TAIL   = 5'd15,  // flush PIPE_N cycles of drain pipeline
         ST_OUT_REQ   = 5'd16,  // s2mm one channel group of this chunk
         ST_OUT_WAIT  = 5'd17,
         ST_CHUNK_END = 5'd18,  // next group / next chunk / next ft / finish
@@ -729,9 +728,9 @@ module controller #(
     end
 
 //---------------------------------------------------------------- [10] compute
-//   ST_PIX_RD drives ibuf_raddr; the lanes (and so the combinational PE result)
-//   are valid in ST_PIX_WR. The accumulator read is issued in the same cycle as
-//   the ibuf read so the two latencies overlap instead of stacking.
+//   ST_PIX_RD drives ibuf_raddr. WR and SUM advance the registered PE path;
+//   the result is consumed in ACC. For an existing partial sum, acc_en keeps
+//   the slot readable through RD/WR/SUM and acc_ph writes it back in ACC.
     always @(*) begin
         ibuf_raddr = in_w[IB_A_BIT-1:0];
         acc_addr   = slot;

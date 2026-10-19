@@ -6,6 +6,11 @@ each decision went the way it did.
 
 Read this before touching `controller.v`.
 
+Current scheduling uses 22 controller states and a four-state pixel loop
+(RD → WR → SUM → ACC). The worked examples retain some earlier memory and
+module-level timing assumptions; the accumulator's two-phase RMW protocol is
+not the whole pixel latency. See `ARCHITECTURE.md` for the current state map.
+
 ---
 
 ## 0. The machine in one paragraph
@@ -68,7 +73,7 @@ for ft   in 0..FN/32-1:          which 32 output channels
         for oh in 0..OH-1:
           fetch input row (oh+fh-pad) of group ct    W*2 words, prefetched
           for ow in 0..OW-1:
-            acc[oh*OW+ow] += in_row[ow+fw-pad] . W   2 cycles
+            acc[oh*OW+ow] += in_row[ow+fw-pad] . W   RD/WR/SUM/ACC: 4 states
   drain all output pixels of this ft out to DRAM
 ```
 
@@ -114,24 +119,26 @@ ibuf depth needed = W          28 for the widest layer.  Depth is 32.
 Measured across all six real layers: **ibuf 28/32, wbuf 8/32, obuf 64/64,
 accumulator 784/1024.** Not one buffer IP had to be regenerated.
 
-### 2.3 Why it is nearly free — the 2-and-2 coincidence
+### 2.3 Overlapping input loads with computation
 
-Each input row is now re-read `FH*FW = 9` times. That sounds expensive. It is
-almost free, because of an exact rate match:
+Each input row is re-read for filter taps. Ping-pong permits a load to overlap
+the pixel sweep, but the extent of overlap depends on the memory interface:
 
 ```
-one ibuf row  = NB_IN = 2 DRAM words     ->  load    2 words per pixel
-one pixel     = 2 cycles (RMW)           ->  compute 2 cycles per pixel
+one input pixel of a channel group = NB_IN = 2 DRAM words
+current pixel schedule             = RD -> WR -> SUM -> ACC (4 states)
 ```
 
-Loading row `oh+1` takes exactly as long as sweeping row `oh`. With ibuf
-ping-pong the load disappears completely underneath the compute.
+The earlier two-cycle analysis assumed ideal memory service and omitted the
+current PE pipeline stages. On the board, single-beat AXI DDR service can
+still stall the sweep; two words must not be treated as two measured cycles.
 
-> **ibuf ping-pong is load-bearing, not an optimisation.** Remove it and the
-> load and the sweep serialise: every layer doubles.
+> **ibuf ping-pong enables load/compute overlap.** Removing it serialises those
+> phases; the slowdown depends on their measured durations.
 
-Cost against a fully-resident map: about **8%**. Benefit: a **128x smaller
-ibuf**, and it scales — depth tracks `W`, not `H*W*C/8`. A 224x224 input would
+An earlier analytical example estimated about **8%** overhead against a
+fully-resident map; this is not a current board measurement. Depth tracks `W`,
+not `H*W*C/8`. A 224x224 input would
 need depth 256, about one BRAM36, where the resident version would need 401,408
 rows.
 
@@ -579,5 +586,7 @@ One mutant was **not** caught and was confirmed equivalent, not a gap:
 in every reachable state, because non-final chunks always close with
 `out_row == OB_DEPTH` and the final chunk's update is immediately reset.
 
-The whole `tb_top` hierarchy elaborates with zero warnings, and all six layers
-are bit-exact against the Python golden model (928/928).
+Recorded end-to-end result: after six layers, the 928 surviving words match the
+Python golden data. This is not a comparison of every intermediate tensor.
+The standalone `tb_controller` is out of sync with the current pipeline; its
+historical shape/mutation results above are not a current passing test result.

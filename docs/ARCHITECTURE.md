@@ -8,7 +8,8 @@ Companion to the other two documents, not a replacement:
 | `DATAFLOW.md` | **why** the loops and layouts are what they are, worked cycle traces |
 | `ARCHITECTURE.md` (this) | **what** each module and signal is, and where every byte goes |
 
-Status: all six layers pass bit-exact in `tb_top`. See section 8.
+Recorded status: a six-layer run in `tb_top` matches 928 surviving output words.
+See section 8 for coverage. This documentation update does not rerun that result.
 
 ---
 
@@ -37,7 +38,7 @@ tester.v                  models the PS. Owns the DRAM (blk_mem_gen 32b x 65536)
   +-- top.v               the accelerator proper
         +-- dma.v         one linear burst at a time: mm2s (read), s2mm (write)
         +-- core.v        datapath + control
-              +-- controller.v      the only FSM. 20 states, all loop counters
+              +-- controller.v      core scheduling FSM: 22 states, all loop counters
               +-- input_buffer.v    ibuf : NB_IN=2 banks x 32b x 32, ping-pong
               +-- weight_buffer.v   wbuf : NB_W=8 banks x 32b x 32, ping-pong
               +-- bank_unpack.v     x2 : bank words -> flat byte lanes
@@ -240,11 +241,13 @@ acc_result[32 x 24b]
 | `ST_ROW_REQ` / `ST_ROW_WAIT` | blocking load of this sweep's first input row, **skipped entirely when `row_oob`** |
 | `ST_RSWAP` | swap ibuf; prefetch the next row, or on the last row prefetch the next weight tile instead |
 | `ST_PIX_RD` | `ibuf_raddr` out, accumulator read |
-| `ST_PIX_WR` | ibuf data arrives → `pe_result`; accumulator write. **2 cycles per pixel, always** — no fast path for `acc_first`, because the ibuf read latency is 1 and the input DMA needs 2 words per pixel anyway |
+| `ST_PIX_WR` | ibuf data enters the registered PE path |
+| `ST_PIX_SUM` | PE / adder-tree pipeline stage |
+| `ST_PIX_ACC` | write the PE result into the accumulator, adding the old slot unless `acc_first`. The current pixel loop has **four states**: RD → WR → SUM → ACC |
 | `ST_ROW_END` | wait for the row prefetch, then next `oh` |
 | `ST_TILE_END` | advance `fw` / `fh` / `ct`, or go and drain |
 | `ST_DRAIN` | accumulator → post path → obuf, pipelined |
-| `ST_DR_TAIL` | one extra cycle: the last obuf write lags |
+| `ST_DR_TAIL` | wait `PIPE_N` cycles (currently 4) to flush the drain pipeline |
 | `ST_OUT_REQ` / `ST_OUT_WAIT` | s2mm one channel group of this chunk |
 | `ST_CHUNK_END` | next group / next chunk / next `ft` / finish |
 | `ST_DONE` | pulse `done` |
@@ -291,7 +294,7 @@ for ft:                            output-channel tile  (COL_SIZE at a time)
         for oh:                             output row
           load input row (oh+fh-pad) of group ct   W*NB_IN words, prefetched
           for ow:                           output column
-            ST_PIX_RD / ST_PIX_WR           2 cycles, accumulator RMW
+            ST_PIX_RD / WR / SUM / ACC      four-state pixel loop
   drain the COL_SIZE channels of every pixel, one obuf chunk at a time
 ```
 
@@ -311,9 +314,10 @@ of one channel group is ever live:
 ibuf depth = W       28 for the widest layer, against a depth of 32
 ```
 
-instead of `H*W*C/ROW_SIZE` = 3136 rows. It is nearly free because of an exact
-match: one ibuf row is `NB_IN = 2` DRAM words and one pixel takes 2 cycles, so
-loading row `oh+1` hides completely under the pixel sweep of row `oh`.
+instead of `H*W*C/ROW_SIZE` = 3136 rows. One input pixel of a channel group
+occupies `NB_IN = 2` DRAM words. Ping-pong permits prefetch of row `oh+1` while
+row `oh` computes. The current pixel loop takes four states; full hiding of the
+load depends on memory service time and must not be assumed for real DDR.
 
 ### 6.4 Padding is two separate things
 
@@ -361,8 +365,8 @@ pipeline latency is registered. Several past bugs were this backwards.
 
 ## 8. Verification status
 
-All six layers pass bit-exact in `tb_top` against `quant_cnn.py`'s integer
-model, in one run of one CSR program:
+The recorded six-layer `tb_top` run compares the surviving output regions
+against `quant_cnn.py`'s integer model. Recorded layer cycle counts are:
 
 | layer | cycles | cumulative |
 |-------|--------|-----------|
@@ -378,12 +382,16 @@ Identical cycle counts in Icarus Verilog and Vivado 2022.1 XSim.
 
 The golden set covers only the regions still live at the end of the program,
 because the activation ping-pong overwrites each layer's output two layers
-later: Conv3's map at ACT_A, Conv2_2's at ACT_B, and the 16 logits at OUT_BASE.
+later: Conv3's 128 words at ACT_A, Conv2_2's 784 at ACT_B, and 16 words at
+OUT_BASE (10 logits and 6 padding words), totaling 928.
 Earlier layers were each verified on their own during bring-up, and
 `quant_cnn.py --upto <layer>` reproduces any of those runs.
 
-Module level: `tb_accumulator` 384 comparisons, `tb_maxpool` 10,688,
-`tb_controller` 11 layer shapes with 4 mutants caught, `dma` 6 burst lengths.
+Recorded module-level checks include `tb_accumulator` and `tb_maxpool`.
+The standalone `tb_controller` is out of sync with the current pipeline and is
+not a passing current-version gate (the README records 54 reported problems).
+Earlier shape and mutation counts in the design record describe those runs;
+this documentation update does not rerun them.
 
 ### Debug tooling
 

@@ -1,6 +1,15 @@
 # VGG-style CNN Inference Accelerator on Kria KV260 (Verilog RTL)
 
-**INT8 weight-stationary CNN accelerator for MNIST — running on real Kria KV260 hardware, bit-exact (928/928) against a Python integer model across all 6 layers.**
+**INT8 weight-stationary CNN accelerator for MNIST on Kria KV260 — a six-layer run with 928/928 surviving output words matching a Python integer model.**
+
+### 본인 기여와 AI 활용 / Contributions and AI assistance
+
+- MLP에서 직접 구현한 PE·곱셈기·adder tree·누산기·저장부를 출발점으로 CNN으로 확장했습니다. Weight-stationary와 최초 32×32 배열은 과제로 주어진 조건이며, 버퍼 구성에는 교수 조언을 반영했습니다.
+- FPGA 자원 제약과 후보 비교를 바탕으로 8×32 배열을 선택했습니다. 비교 스크립트는 AI를 활용해 작성했고, 결과 비교와 배열 선택은 직접 수행했습니다.
+- CNN의 adder tree 변경·PE 파이프라인 추가·누산기 BRAM 전환은 원인과 수정 방향을 판단하고 AI와 함께 수정했습니다. Maxpool은 AI 초안을 직접 수정했습니다.
+- Controller는 AI 초안을 실행했고 CSR는 코드를 확인했습니다. CNN RTL 작성에 생성형 AI를 폭넓게 활용했으며, 시뮬레이션과 KV260 실행 결과는 직접 확인했습니다.
+
+See [contribution details](docs/CONTRIBUTIONS.md) for the distinction between reused code, design decisions, AI-assisted changes and execution.
 
 > ### Status — **Running on hardware**
 > | stage | result |
@@ -9,6 +18,11 @@
 > | RTL simulation, full board topology over AXI (`tb_top_kv260`) | 928/928 bit-exact |
 > | Synthesis + place & route on **xck26 (KV260)** | timing met, WNS **+1.652 ns** @ 100 MHz |
 > | **On-board, KV260 bare-metal** | **928/928 bit-exact, 68.8 ms / image** |
+
+These are recorded project results, not new measurements from this documentation
+update. The 928 words are the regions still live after a single-image six-layer
+run; they do not include every intermediate tensor. See §4 for verification and
+timer boundaries. Match the RTL, generated data and bitstream when reproducing.
 
 ```
 === KV260 CNN accelerator : full 6-layer run ===
@@ -104,7 +118,7 @@ top_kv260.v               board top: AXI-Lite CSR slave + AXI4 DDR master around
   +-- top.v               the accelerator proper
         +-- dma.v         one linear burst at a time: mm2s (read), s2mm (write)
         +-- core.v        datapath + control
-              +-- controller.v      the only FSM. 20 states, all loop counters
+              +-- controller.v      core scheduling FSM: 22 states, all loop counters
               +-- input_buffer.v    ibuf : NB_IN=2 banks x 32b x 32, ping-pong
               +-- weight_buffer.v   wbuf : NB_W=8 banks x 32b x 32, ping-pong
               +-- bank_unpack.v     x2 : bank words -> flat INT8 byte lanes
@@ -140,8 +154,10 @@ for ft:                              output-channel tile  (COL_SIZE = 32 at a ti
         for oh:                      output row
           load input row (oh+fh-pad) of group ct    W*NB_IN words, prefetched
           for ow:                    output column
-            ST_PIX_RD  ibuf address out, accumulator READ
-            ST_PIX_WR  ibuf data in,     accumulator WRITE
+            ST_PIX_RD   ibuf address out, accumulator read if accumulating
+            ST_PIX_WR   ibuf data enters the registered PE path
+            ST_PIX_SUM  PE / adder-tree pipeline
+            ST_PIX_ACC  accumulator write (four-state pixel loop)
   drain: acc -> BN -> ReLU -> requant -> maxpool -> obuf -> s2mm
 ```
 
@@ -159,6 +175,13 @@ Key points:
 
 ### 4.1 Simulation
 
+The committed `gold_addr.txt` contains 928 addresses: 784 words from Conv2_2,
+128 from Conv3 and 16 from Affine (10 INT32 logits plus 6 padding words).
+Convolution activations are packed four INT8 values per 32-bit word.
+`quant_cnn.py` retains the latest output at each ping-pong base, so the final
+comparison checks surviving regions after all six layers have executed.
+Checking each earlier layer separately requires a corresponding `--upto` run.
+
 | testbench | what it checks | result |
 |---|---|---|
 | `tb_top` | full 6-layer network, `tester.v` + BRAM DRAM, vs `quant_cnn.py` | **928/928**, 494,322 cycles (Icarus and XSim) |
@@ -174,8 +197,15 @@ must fail. A test that has never failed has not been shown to test anything.
 ### 4.2 On hardware
 
 `sw/kv260_test` loads the DRAM image (input + weights + BN + CSR program) into DDR,
-replays the CSR program exactly like `tb_top_kv260`, and compares the 928 output words
-against the golden model. **928/928 match.**
+replays the CSR program exactly like `tb_top_kv260`, and compares the 928 surviving
+output words against the golden model. **Recorded result: 928/928 match.**
+
+In `main.c`, the total timer encloses CSR programming, layer start/done polling
+and per-layer `xil_printf` calls. Each layer timer covers its start write through
+done polling only. Thus 68,846 us total is not the sum of the six layer times
+(68,580 us). DDR image loading/readback and the final golden comparison are
+outside the total timer. This is a recorded single-image run, not an average or
+an on-board MNIST accuracy sweep.
 
 | layer | on board | BRAM-direct sim (ideal memory) |
 |---|---:|---:|
@@ -187,10 +217,12 @@ against the golden model. **928/928 match.**
 | Affine | 1.52 ms | 0.10 ms |
 | **total** | **68.8 ms** | **4.94 ms** |
 
-**Every layer is memory-bound.** `axi4_master_dram.v` issues single-beat AXI4
+`axi4_master_dram.v` issues single-beat AXI4
 transactions, so each DDR word pays a full round trip to the PS DDR controller.
-The same datapath with ideal single-cycle memory takes 4.94 ms — **AXI4 burst
-transfers are the next step** and the largest available speed-up.
+The recorded BRAM-direct simulation takes 4.94 ms, versus the board loop's
+68.8 ms with different memory and host timing conditions. Single-beat DDR access
+is a performance limitation; **AXI4 burst transfers are in progress**. No measured
+post-burst speed-up is claimed here.
 
 ---
 
@@ -274,6 +306,13 @@ The output is bit-identical to the committed `dram.txt`, `gold.txt` and `gold_ad
 - **Memory-bound on hardware** (single-beat AXI4) — see §4.2. Burst transfers are next.
 - **JTAG bring-up only.** Standalone SD boot (BOOT.BIN) not yet done; there the FSBL
   handles isolation/reset itself and the application's manual release becomes redundant.
-- **Conv1_1 low-channel problem** — `C=1` wastes PE rows; space-to-depth would help more
-  than raising PE utilisation. Small-P layers (Conv3, Affine) pay per-tile overhead.
-  Affine prefers the opposite array shape (3.8x). See `docs/DESIGN_NOTES.md`.
+- **First-layer mapping:** `quant_cnn.py` converts Conv1_1's nine filter taps into
+  16 im2col lanes; the hardware executes it as a 1x1 layer in two 8-lane groups.
+  Shape/utilisation estimates must account for that mapping.
+- **Array cost model:** the linked Python repository's `analyze_hw.py` uses an
+  earlier network (Conv3 pad1, Affine input 1152) and simplified cycle/memory
+  assumptions. Its shape comparisons are estimates for that model, not measured
+  speed-ups of the final pad0 / Affine-512 design.
+- **Documentation history:** `DESIGN_NOTES.md` retains earlier experiments and
+  assumptions. Current pixel scheduling is RD → WR → SUM → ACC; old two-cycle
+  descriptions are not the current controller's throughput.
